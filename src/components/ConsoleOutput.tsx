@@ -1,16 +1,25 @@
 
 import { useState } from 'react';
-import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ConsoleOutputProps {
   output: string;
   error?: string;
   isLoading?: boolean;
+  executionTime?: number;
+  executedBy?: string;
   onClear: () => void;
 }
 
-const ConsoleOutput = ({ output, error, isLoading = false, onClear }: ConsoleOutputProps) => {
+const ConsoleOutput = ({ 
+  output, 
+  error, 
+  isLoading = false, 
+  executionTime,
+  executedBy,
+  onClear 
+}: ConsoleOutputProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
@@ -19,7 +28,20 @@ const ConsoleOutput = ({ output, error, isLoading = false, onClear }: ConsoleOut
       isExpanded ? "fixed inset-0 z-50 m-4" : "h-full"
     )}>
       <div className="flex items-center justify-between bg-zinc-800 px-4 py-2">
-        <h3 className="text-sm font-medium text-white">Console Output</h3>
+        <div className="flex items-center">
+          <h3 className="text-sm font-medium text-white">Console Output</h3>
+          {executedBy && (
+            <span className="ml-2 text-xs text-gray-400">
+              (executed by {executedBy})
+            </span>
+          )}
+          {executionTime && (
+            <div className="ml-3 flex items-center text-xs text-gray-400">
+              <Clock size={12} className="mr-1" />
+              {executionTime}s
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
           <button 
             onClick={onClear} 

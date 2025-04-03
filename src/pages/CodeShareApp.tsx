@@ -13,7 +13,10 @@ import {
   updateCode as broadcastCodeUpdate,
   updateLanguage as broadcastLanguageUpdate,
   subscribeToRoom,
-  getUsers
+  getUsers,
+  updateCursorPosition,
+  updateUserStatus,
+  broadcastExecutionResult
 } from '@/services/collaborationService';
 import { Play, Code, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,7 +31,7 @@ const CodeShareApp = () => {
   const [roomId, setRoomId] = useState<string | null>(searchParams.get('room'));
   const [userId, setUserId] = useState<string | null>(null);
   const [userName, setUserName] = useState<string>('');
-  const [users, setUsers] = useState<Array<{ id: string; name: string }>>([]);
+  const [users, setUsers] = useState<Array<{ id: string; name: string; activeStatus?: string; cursorPosition?: {line: number; column: number} }>>([]);
   
   const [code, setCode] = useState<string>('');
   const [language, setLanguage] = useState<string>('javascript');
@@ -36,6 +39,8 @@ const CodeShareApp = () => {
   const [error, setError] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<string>('code');
+  const [executionTime, setExecutionTime] = useState<number | undefined>(undefined);
+  const [executedBy, setExecutedBy] = useState<string | undefined>(undefined);
   
   // Handle room joining
   const handleJoinRoom = useCallback((roomId: string, userName: string) => {
@@ -79,7 +84,21 @@ const CodeShareApp = () => {
         case 'user_leave':
           setUsers(event.data.users);
           break;
-        // We would handle cursor moves here in a real implementation
+        case 'language_change':
+          setLanguage(event.data.language);
+          setOutput('');
+          setError('');
+          break;
+        case 'execution_result':
+          // Another user executed code, show their results
+          const executingUser = users.find(u => u.id === event.data.userId);
+          if (executingUser) {
+            setOutput(event.data.result.output);
+            setError(event.data.result.error || '');
+            setExecutionTime(event.data.result.executionTime);
+            setExecutedBy(executingUser.name);
+          }
+          break;
       }
     });
     
@@ -90,7 +109,7 @@ const CodeShareApp = () => {
         leaveRoom(roomId, userId);
       }
     };
-  }, [roomId, userId]);
+  }, [roomId, userId, users]);
   
   // Handle code updates
   const handleCodeChange = useCallback((newCode: string) => {
@@ -107,12 +126,21 @@ const CodeShareApp = () => {
     setLanguage(newLanguage);
     setOutput('');
     setError('');
+    setExecutionTime(undefined);
+    setExecutedBy(undefined);
     
     // Broadcast language change
     if (roomId) {
       broadcastLanguageUpdate(roomId, newLanguage);
     }
   }, [roomId]);
+  
+  // Handle cursor movement
+  const handleCursorMove = useCallback((position: { line: number, column: number }) => {
+    if (roomId && userId) {
+      updateCursorPosition(roomId, userId, position);
+    }
+  }, [roomId, userId]);
   
   // Run code
   const runCode = useCallback(async () => {
@@ -125,20 +153,33 @@ const CodeShareApp = () => {
       return;
     }
     
+    if (!roomId || !userId) return;
+    
     setIsRunning(true);
     setOutput('');
     setError('');
+    setExecutionTime(undefined);
+    setExecutedBy(undefined);
+    
+    // Update user status to executing
+    updateUserStatus(roomId, userId, 'executing');
     
     try {
-      const result = await executeCode(code, language);
+      const result = await executeCode(code, language, roomId, userId);
       setOutput(result.output);
       setError(result.error || '');
+      setExecutionTime(result.executionTime);
+      setExecutedBy(userName);
+      
+      // Broadcast execution result to others
+      broadcastExecutionResult(roomId, userId, result);
     } catch (err) {
       setError(`Execution failed: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setIsRunning(false);
+      // Status is reset by the collaboration service
     }
-  }, [code, language, toast]);
+  }, [code, language, roomId, userId, toast, userName]);
   
   // Save code
   const handleSaveCode = useCallback(async () => {
@@ -163,6 +204,8 @@ const CodeShareApp = () => {
   const clearConsole = useCallback(() => {
     setOutput('');
     setError('');
+    setExecutionTime(undefined);
+    setExecutedBy(undefined);
   }, []);
   
   // If no room is joined yet, show the room creator
@@ -173,6 +216,9 @@ const CodeShareApp = () => {
       </div>
     );
   }
+  
+  // Filter out current user from other users list for cursor display
+  const otherUsers = users.filter(user => user.id !== userId);
   
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col">
@@ -209,6 +255,8 @@ const CodeShareApp = () => {
                   language={language}
                   onChange={handleCodeChange}
                   userName={userName}
+                  userCursors={otherUsers}
+                  onCursorMove={handleCursorMove}
                 />
                 
                 <Button
@@ -228,6 +276,8 @@ const CodeShareApp = () => {
                 output={output}
                 error={error}
                 isLoading={isRunning}
+                executionTime={executionTime}
+                executedBy={executedBy}
                 onClear={clearConsole}
               />
             </div>
