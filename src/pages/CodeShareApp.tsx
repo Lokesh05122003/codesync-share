@@ -5,6 +5,7 @@ import CodeEditor from '@/components/CodeEditor';
 import ConsoleOutput from '@/components/ConsoleOutput';
 import CodeShareHeader from '@/components/CodeShareHeader';
 import RoomCreator from '@/components/RoomCreator';
+import Whiteboard from '@/components/Whiteboard';
 import { executeCode, saveCode, loadCode } from '@/services/codeService';
 import { 
   joinRoom, 
@@ -14,8 +15,9 @@ import {
   subscribeToRoom,
   getUsers
 } from '@/services/collaborationService';
-import { Play } from 'lucide-react';
+import { Play, Code, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 
 const CodeShareApp = () => {
@@ -33,6 +35,7 @@ const CodeShareApp = () => {
   const [output, setOutput] = useState<string>('');
   const [error, setError] = useState<string>('');
   const [isRunning, setIsRunning] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<string>('code');
   
   // Handle room joining
   const handleJoinRoom = useCallback((roomId: string, userName: string) => {
@@ -181,36 +184,59 @@ const CodeShareApp = () => {
         users={users}
       />
       
-      <div className="flex-1 flex flex-col md:flex-row">
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 relative">
-            <CodeEditor 
-              code={code}
-              language={language}
-              onChange={handleCodeChange}
-              userName={userName}
-            />
+      <div className="px-2 pt-2 bg-zinc-900">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-60 grid-cols-2">
+            <TabsTrigger value="code" className="flex items-center gap-1">
+              <Code size={16} />
+              <span>Code Editor</span>
+            </TabsTrigger>
+            <TabsTrigger value="whiteboard" className="flex items-center gap-1">
+              <PenTool size={16} />
+              <span>Whiteboard</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+      
+      <div className="flex-1 flex flex-col">
+        <Tabs value={activeTab} className="flex-1 flex flex-col">
+          <TabsContent value="code" className="flex-1 flex flex-col md:flex-row mt-0">
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 relative">
+                <CodeEditor 
+                  code={code}
+                  language={language}
+                  onChange={handleCodeChange}
+                  userName={userName}
+                />
+                
+                <Button
+                  onClick={runCode}
+                  disabled={isRunning}
+                  className="absolute bottom-4 right-4 bg-green-600 hover:bg-green-700"
+                  size="sm"
+                >
+                  <Play size={16} className="mr-1" />
+                  Run
+                </Button>
+              </div>
+            </div>
             
-            <Button
-              onClick={runCode}
-              disabled={isRunning}
-              className="absolute bottom-4 right-4 bg-green-600 hover:bg-green-700"
-              size="sm"
-            >
-              <Play size={16} className="mr-1" />
-              Run
-            </Button>
-          </div>
-        </div>
-        
-        <div className="h-64 md:h-auto md:w-2/5 border-t md:border-t-0 md:border-l border-zinc-700">
-          <ConsoleOutput 
-            output={output}
-            error={error}
-            isLoading={isRunning}
-            onClear={clearConsole}
-          />
-        </div>
+            <div className="h-64 md:h-auto md:w-2/5 border-t md:border-t-0 md:border-l border-zinc-700">
+              <ConsoleOutput 
+                output={output}
+                error={error}
+                isLoading={isRunning}
+                onClear={clearConsole}
+              />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="whiteboard" className="flex-1 mt-0 border-none p-0">
+            <Whiteboard roomId={roomId} userName={userName} />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

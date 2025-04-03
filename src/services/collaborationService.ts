@@ -5,7 +5,7 @@
 import { v4 as uuidv4 } from 'uuid';
 
 type CollaborationCallback = (data: any) => void;
-type CollaborationEventType = 'code_change' | 'user_join' | 'user_leave' | 'cursor_move';
+type CollaborationEventType = 'code_change' | 'user_join' | 'user_leave' | 'cursor_move' | 'whiteboard_update';
 
 interface User {
   id: string;
@@ -17,6 +17,7 @@ const roomUsers: Record<string, User[]> = {};
 const roomCodes: Record<string, string> = {};
 const roomLanguages: Record<string, string> = {};
 const callbacks: Record<string, CollaborationCallback[]> = {};
+const whiteboardCallbacks: Record<string, CollaborationCallback[]> = {};
 
 // Generate a session ID for this browser instance
 const sessionId = uuidv4();
@@ -43,6 +44,7 @@ export const joinRoom = (roomId: string, userName: string): string => {
   if (!roomUsers[roomId]) {
     roomUsers[roomId] = [];
     callbacks[roomId] = [];
+    whiteboardCallbacks[roomId] = [];
   }
   
   // Add user to room
@@ -103,4 +105,34 @@ export const getUsers = (roomId: string): User[] => {
 // Mock function to simulate cursor movement (would be implemented with WebSockets in a real app)
 export const updateCursorPosition = (roomId: string, userId: string, position: { line: number, column: number }): void => {
   broadcastToRoom(roomId, 'cursor_move', { userId, position });
+};
+
+// Whiteboard collaboration functions
+export const broadcastWhiteboardUpdate = (roomId: string, data: any): void => {
+  if (!whiteboardCallbacks[roomId]) {
+    whiteboardCallbacks[roomId] = [];
+    return;
+  }
+  
+  // Simulate network delay for realism
+  setTimeout(() => {
+    whiteboardCallbacks[roomId].forEach(callback => {
+      callback(data);
+    });
+  }, Math.random() * 100); // Random delay between 0-100ms
+};
+
+export const subscribeToWhiteboardUpdates = (roomId: string, callback: CollaborationCallback): () => void => {
+  if (!whiteboardCallbacks[roomId]) {
+    whiteboardCallbacks[roomId] = [];
+  }
+  
+  whiteboardCallbacks[roomId].push(callback);
+  
+  // Return unsubscribe function
+  return () => {
+    if (whiteboardCallbacks[roomId]) {
+      whiteboardCallbacks[roomId] = whiteboardCallbacks[roomId].filter(cb => cb !== callback);
+    }
+  };
 };
